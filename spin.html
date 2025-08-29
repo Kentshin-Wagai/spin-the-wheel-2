@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Sofitech | Spin Wheel</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #0d1117;
+      --panel: rgba(255,255,255,0.04);
+      --border: rgba(255,255,255,0.07);
+      --text: #e0e0e0;
+      --accent: #00ffc8;
+      --accent-2: #07e1ff;
+    }
+    * { box-sizing: border-box; font-family: 'Montserrat', sans-serif; }
+    body {
+      margin: 0; background: var(--bg); color: var(--text);
+      min-height: 100vh; display: grid; place-items: center; padding: 18px;
+    }
+    .wrap {
+      position: relative;           /* needed for overlay confetti canvas */
+      width: 100%; max-width: 900px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 16px; padding: 20px;
+      box-shadow: 0 0 20px rgba(0,255,255,0.05);
+    }
+    header { text-align: center; margin-bottom: 10px; }
+    h1 { margin: 0; color: var(--accent); font-size: 24px; letter-spacing: .3px; }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 320px;
+      gap: 20px;
+      align-items: center;
+    }
+    @media (max-width: 860px) { .grid { grid-template-columns: 1fr; } }
+
+    .canvas-wrap {
+      position: relative;
+      display: grid; place-items: center;
+      padding: 10px;
+    }
+    canvas#wheel {
+      width: 100%;
+      max-width: 540px;
+      aspect-ratio: 1 / 1;
+      display: block;
+      border-radius: 50%;
+      background: radial-gradient(130% 130% at 30% 30%, #131a22, #0e141a);
+      box-shadow:
+        inset 0 0 60px rgba(0,0,0,.45),
+        0 0 0 2px rgba(255,255,255,0.06);
+    }
+
+    /* pointer */
+    .pointer {
+      position: absolute;
+      top: 50%; right: -6px; transform: translateY(-50%);
+      width: 0; height: 0; border-left: 18px solid var(--accent);
+      border-top: 12px solid transparent; border-bottom: 12px solid transparent;
+      filter: drop-shadow(0 0 6px rgba(0,255,200,.5));
+    }
+    @media (max-width: 860px) { .pointer { right: 2px; } }
+
+    .panel {
+      background: rgba(255,255,255,0.03);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px;
+    }
+    .list { max-height: 360px; overflow: auto; padding-right: 6px; font-size: 14px; line-height: 1.8; }
+    .list b { color: var(--accent); }
+    .controls { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+    .btn {
+      appearance: none; border: 0; cursor: pointer;
+      padding: 10px 14px; border-radius: 10px;
+      font-weight: 600; color: #0d1117; background: var(--accent);
+      transition: transform .15s ease, background .2s ease;
+    }
+    .btn:hover { transform: translateY(-1px); }
+    .btn:disabled { opacity: .6; cursor: not-allowed; transform: none; }
+    .btn.secondary { background: #2b2f36; color: var(--text); border: 1px solid #39424c; }
+    .hint { opacity: .75; font-size: 13px; margin-top: 8px; }
+
+    .result {
+      margin-top: 12px; padding: 10px 12px;
+      border: 1px dashed rgba(255,255,255,0.15);
+      border-radius: 10px; background: rgba(255,255,255,0.02);
+      font-weight: 600;
+    }
+    .result .pill {
+      display: inline-block; margin-left: 6px; padding: 2px 8px; border-radius: 999px;
+      background: linear-gradient(90deg, var(--accent), var(--accent-2));
+      color: #0d1117;
+    }
+
+    /* Confetti overlay canvas spans the whole card */
+    canvas#fx {
+      position: absolute; inset: 0;
+      width: 100%; height: 100%;
+      pointer-events: none;         /* does not block clicks */
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header><h1 id="title">Spin Wheel</h1></header>
+
+    <div class="grid">
+      <div class="canvas-wrap" id="wheelWrap">
+        <canvas id="wheel" width="800" height="800" aria-label="Prize wheel"></canvas>
+        <div class="pointer" aria-hidden="true"></div>
+      </div>
+
+      <div class="panel">
+        <div id="summary" class="list"></div>
+
+        <div class="controls">
+          <button id="spinBtn" class="btn">Spin</button>
+          <button id="againBtn" class="btn secondary" disabled>Spin Again</button>
+          <a href="index.html" class="btn secondary">← Back to Setup</a>
+        </div>
+
+        <div id="result" class="result" hidden>
+          Result: <span class="pill" id="winnerText">—</span>
+        </div>
+        <div class="hint">Tip: click the wheel or press <b>Spin</b>.</div>
+      </div>
+    </div>
+
+    <!-- Confetti overlay -->
+    <canvas id="fx"></canvas>
+  </div>
+
+  <script>
+  (() => {
+    // ---------- data ----------
+    const payload = sessionStorage.getItem("wheelSetup");
+    let title = "Spin Wheel";
+    let items = ["Sample A", "Sample B", "Sample C"];
+
+    if (payload) {
+      try {
+        const { title: t, items: it } = JSON.parse(payload);
+        if (t && typeof t === "string") title = t;
+        if (Array.isArray(it) && it.filter(Boolean).length >= 2) {
+          items = it.filter(v => String(v).trim().length > 0);
+        }
+      } catch {}
+    }
+    document.getElementById("title").textContent = title;
+
+    // populate sidebar list
+    const summary = document.getElementById("summary");
+    summary.innerHTML = items.map((txt, i) =>
+      `<div><b>${i+1}.</b> ${escapeHTML(txt)}</div>`).join("");
+
+    // ---------- canvas / draw ----------
+    const $canvas = document.getElementById("wheel");
+    const ctx = $canvas.getContext("2d");
+
+    function fitCanvas() {
+      const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+      const size = Math.min($canvas.clientWidth, $canvas.clientHeight || $canvas.clientWidth);
+      $canvas.width = size * dpr;
+      $canvas.height = size * dpr;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      draw();
+    }
+    window.addEventListener("resize", fitCanvas, { passive: true });
+
+    let angle = 0;              // current rotation (radians)
+    let isSpinning = false;
+    let winnerIndex = -1;
+
+    // Distinct colors per slice
+    const sliceColors = generateColors(items.length);
+
+    function draw() {
+      const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+      const w = $canvas.width / dpr;
+      const h = $canvas.height / dpr;
+      const cx = w / 2, cy = h / 2;
+      const r = Math.min(w, h) * 0.48;
+      const step = (Math.PI * 2) / items.length;
+
+      ctx.clearRect(0, 0, w, h);
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(angle);
+
+      for (let i = 0; i < items.length; i++) {
+        const a0 = i * step;
+        const a1 = a0 + step;
+
+        // sector fill
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.arc(0, 0, r, a0, a1);
+        ctx.closePath();
+        ctx.fillStyle = sliceColors[i];
+        ctx.fill();
+
+        // neon arc edge
+        ctx.strokeStyle = i === winnerIndex ? "#ffffff" : "rgba(0,255,200,0.85)";
+        ctx.lineWidth = i === winnerIndex ? 3 : 2;
+        ctx.beginPath();
+        ctx.arc(0, 0, r, a0, a1);
+        ctx.stroke();
+
+        // text
+        ctx.save();
+        const baseSize = Math.max(12, r * 0.09);
+        ctx.font = `600 ${baseSize}px Montserrat, sans-serif`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+
+        const ta = a0 + step / 2;
+        const tx = Math.cos(ta) * r * 0.70;
+        const ty = Math.sin(ta) * r * 0.70;
+
+        ctx.translate(tx, ty);
+        ctx.rotate(ta);
+
+        const label = items[i];
+        ctx.lineWidth = 6;
+        ctx.strokeStyle = "rgba(255,255,255,0.55)";
+        shrinkTextToWidth(ctx, label, r * 0.95);
+        ctx.strokeText(label, 0, 0);
+        ctx.fillStyle = "rgba(10,20,28,1)";
+        ctx.fillText(label, 0, 0);
+
+        ctx.restore();
+      }
+
+      // glossy center
+      const grd = ctx.createRadialGradient(0, 0, r*0.1, -r*0.2, -r*0.2, r*1.1);
+      grd.addColorStop(0, "rgba(0,255,200,0.10)");
+      grd.addColorStop(1, "rgba(255,255,255,0.00)");
+      ctx.fillStyle = grd;
+      ctx.beginPath();
+      ctx.arc(0, 0, r, 0, Math.PI*2);
+      ctx.fill();
+
+      // hub
+      ctx.beginPath();
+      ctx.arc(0, 0, r*0.08, 0, Math.PI*2);
+      ctx.fillStyle = "#0f141a";
+      ctx.fill();
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = "rgba(0,255,200,0.8)";
+      ctx.stroke();
+
+      ctx.restore();
+    }
+
+    function shrinkTextToWidth(ctx, text, maxWidth) {
+      let size = parseInt(ctx.font.match(/(\d+)px/)[1], 10);
+      while (ctx.measureText(text).width > maxWidth && size > 10) {
+        size -= 1;
+        const parts = ctx.font.split(" ");
+        parts[1] = size + "px";
+        ctx.font = parts.join(" ");
+      }
+    }
+
+    // ---------- spin logic ----------
+    const spinBtn = document.getElementById("spinBtn");
+    const againBtn = document.getElementById("againBtn");
+    const resultBox = document.getElementById("result");
+    const winnerText = document.getElementById("winnerText");
+
+    function chooseTargetAngle() {
+      const step = (Math.PI * 2) / items.length;
+      const idx = Math.floor(Math.random() * items.length);
+
+      // random offset inside slice (±60% of half-slice)
+      const half = step / 2;
+      const jitter = (Math.random() - 0.5) * (half * 1.2);
+
+      const sliceCenter = idx * step + half + jitter;
+      const extraSpins = 5 + Math.floor(Math.random() * 3); // 5–7 spins
+      const target = (Math.PI * 2) * extraSpins - sliceCenter;
+      return { idx, target };
+    }
+
+    function easeOutCubic(t) { return 1 - Math.pow(1 - t, 3); }
+
+    function spin() {
+      if (isSpinning) return;
+      isSpinning = true;
+      spinBtn.disabled = true;
+      againBtn.disabled = true;
+      resultBox.hidden = true;
+      winnerIndex = -1;
+
+      const { target } = chooseTargetAngle();
+      const start = angle;
+      const delta = forceForward(start, target);       // multiple forward turns
+      const duration = 3800 + Math.random()*1200;      // 3.8–5s
+
+      const t0 = performance.now();
+      requestAnimationFrame(function animate(now) {
+        const t = Math.min(1, (now - t0) / duration);
+        const eased = easeOutCubic(t);
+        angle = start + delta * eased;
+        draw();
+
+        if (t < 1) {
+          requestAnimationFrame(animate);
+        } else {
+          const a = mod(-angle, Math.PI*2);            // wheel rotation inverted
+          const step = (Math.PI*2)/items.length;
+          const idxAtPointer = Math.floor(a / step) % items.length;
+          winnerIndex = idxAtPointer;
+          draw();
+
+          winnerText.textContent = items[winnerIndex];
+          resultBox.hidden = false;
+          againBtn.disabled = false;
+          isSpinning = false;
+
+          // 🎉 Confetti burst near the pointer (right-center of wheel)
+          const origin = pointerPixel();
+          confettiBurst(origin.x, origin.y);
+        }
+      });
+    }
+
+    function forceForward(from, to) {
+      const TAU = Math.PI * 2;
+      while (to <= from + TAU * 3) to += TAU; // ensure at least 3 spins
+      return to - from;
+    }
+
+    function mod(a, n) { return ((a % n) + n) % n; }
+
+    spinBtn.addEventListener("click", spin);
+    againBtn.addEventListener("click", () => { if (!isSpinning) spin(); });
+    $canvas.addEventListener("click", spin);
+
+    function escapeHTML(s) {
+      return String(s)
+        .replaceAll("&","&amp;").replaceAll("<","&lt;")
+        .replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#039;");
+    }
+
+    function generateColors(n) {
+      const arr = [];
+      for (let i = 0; i < n; i++) {
+        const hue = Math.round((360 / n) * i);
+        const light = i % 2 ? 55 : 45;
+        const sat = 78;
+        arr.push(`hsl(${hue} ${sat}% ${light}%)`);
+      }
+      return arr;
+    }
+
+    // ---------- Confetti ----------
+    const fxCanvas = document.getElementById("fx");
+    const fxCtx = fxCanvas.getContext("2d");
+
+    function fitFxCanvas() {
+      const rect = document.querySelector(".wrap").getBoundingClientRect();
+      const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+      fxCanvas.width = Math.round(rect.width * dpr);
+      fxCanvas.height = Math.round(rect.height * dpr);
+      fxCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      // CSS sizes already set via CSS (inset:0), so no need to set style width/height
+    }
+    window.addEventListener("resize", fitFxCanvas, { passive: true });
+    fitFxCanvas();
+
+    function pointerPixel() {
+      // compute pixel coords for pointer tip relative to fx canvas
+      const wrapRect = document.querySelector(".wrap").getBoundingClientRect();
+      const wheelRect = $canvas.getBoundingClientRect();
+      const x = (wheelRect.right - wrapRect.left) - 6;            // pointer triangle left edge
+      const y = (wheelRect.top + wheelRect.height / 2) - wrapRect.top;
+      return { x, y };
+    }
+
+    const CONF_COLORS = ["#ff4757","#ffa502","#2ed573","#1e90ff","#a55eea","#ff6b81","#7bed9f","#70a1ff","#eccc68","#ff9ff3"];
+
+    let confetti = [];
+    let confettiRAF = null;
+
+    function confettiBurst(x, y, count = 140) {
+      fitFxCanvas();
+      confetti = [];
+      for (let i = 0; i < count; i++) {
+        const angle = (Math.random() * Math.PI) - Math.PI/2; // shoot mostly leftward
+        const speed = 4 + Math.random() * 6;
+        confetti.push({
+          x, y,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed - 2,  // little pop
+          size: 6 + Math.random() * 6,
+          rot: Math.random() * Math.PI,
+          vr: (Math.random() - 0.5) * 0.3,
+          color: CONF_COLORS[i % CONF_COLORS.length],
+          life: 70 + Math.random() * 40,    // frames
+          alpha: 1
+        });
+      }
+      if (!confettiRAF) animateConfetti();
+    }
+
+    function animateConfetti() {
+      confettiRAF = requestAnimationFrame(animateConfetti);
+      fxCtx.clearRect(0, 0, fxCanvas.width, fxCanvas.height);
+
+      for (const p of confetti) {
+        // physics
+        p.vx *= 0.99;             // drag
+        p.vy += 0.25;             // gravity
+        p.x += p.vx;
+        p.y += p.vy;
+        p.rot += p.vr;
+        p.life -= 1;
+        if (p.life < 20) p.alpha = Math.max(0, p.life / 20);
+
+        // draw rect “paper”
+        fxCtx.save();
+        fxCtx.translate(p.x, p.y);
+        fxCtx.rotate(p.rot);
+        fxCtx.globalAlpha = p.alpha;
+        fxCtx.fillStyle = p.color;
+        fxCtx.fillRect(-p.size/2, -p.size/4, p.size, p.size/2);
+        fxCtx.restore();
+      }
+
+      // cull / stop when done
+      confetti = confetti.filter(p => p.alpha > 0 && p.y < fxCanvas.height + 40);
+      if (confetti.length === 0) {
+        cancelAnimationFrame(confettiRAF);
+        confettiRAF = null;
+      }
+    }
+
+    // init
+    fitCanvas();
+    draw();
+  })();
+  </script>
+</body>
+</html>

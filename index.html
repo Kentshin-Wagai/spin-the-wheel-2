@@ -1,1 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Sofitech | Setup Wheel</title>
+  <link rel="icon" type="image/png" href="Photos/Logos/sofisocialogo.png" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600&display=swap" rel="stylesheet" />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Montserrat', sans-serif; }
+    body {
+      background-color: #0d1117; min-height: 100vh; display: flex; justify-content: center;
+      align-items: center; padding: 20px; color: #e0e0e0;
+    }
+    .card {
+      background: rgba(255,255,255,0.04);
+      backdrop-filter: blur(20px);
+      border: 1px solid rgba(255,255,255,0.07);
+      padding: 30px 25px;
+      border-radius: 16px;
+      box-shadow: 0 0 20px rgba(0,255,255,0.05);
+      text-align: center;
+      width: 100%;
+      max-width: 420px;
+      animation: fadeIn 0.6s ease;
+    }
+    .logo { width: 100px; margin-bottom: 20px; }
+    h2 { font-size: 22px; font-weight: 600; color: #00ffc8; margin-bottom: 18px; letter-spacing: .3px; }
 
+    /* Floating label group */
+    .field {
+      position: relative;
+      text-align: left;
+      isolation: isolate;        /* predictable z-index */
+      --field-bg: #161b22;       /* same as input bg */
+    }
+    .input {
+      position: relative;
+      z-index: 1;                /* below label */
+      width: 100%;
+      background: var(--field-bg);
+      color: #e0e0e0;
+      border: 1px solid #333;
+      border-radius: 10px;
+      padding: 14px 14px;
+      outline: none;
+      font-size: 14px;
+      transition: border-color .2s ease, box-shadow .2s ease;
+    }
+    .input:focus {
+      border-color: #00ffc8;
+      box-shadow: 0 0 0 4px rgba(0,255,200,0.08);
+    }
+    .item-input { padding-right: 42px; } /* room for the ❌ button */
+
+    /* Floating label with pill + halo to mask border/glow */
+    .label {
+      position: absolute;
+      left: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      padding: 0 8px;
+      color: #9aa4ad;
+      font-size: 14px;
+      pointer-events: none;
+      background: var(--field-bg);        /* solid pill bg */
+      border-radius: 8px;
+      z-index: 3;                          /* above input + glow */
+      box-shadow: 0 0 0 6px var(--field-bg); /* halo masks line under label */
+      transition: top .18s ease, font-size .18s ease, color .18s ease, transform .18s ease;
+    }
+    .input:focus + .label,
+    .input:not(:placeholder-shown) + .label {
+      top: -12px;           /* lifted higher to clear rounded corner */
+      transform: none;
+      font-size: 12px;
+      color: #00ffc8;
+    }
+
+    /* Spacing */
+    #itemsContainer { margin-top: 5px; }       /* gap below title */
+    #itemsContainer .field { margin-top: 8px; }/* gap between items */
+
+    /* Main buttons */
+    .btn {
+      margin-top: 15px;
+      background: #00ffc8;
+      color: #0d1117;
+      border: none;
+      border-radius: 10px;
+      padding: 12px 16px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 600;
+      transition: background .2s ease;
+      width: 100%;
+    }
+    .btn:hover { background: #00e6b2; }
+
+    /* Circular remove ❌ button */
+    .icon-btn {
+      position: absolute;
+      right: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: #2b2f36;
+      border: 1px solid #444;
+      color: #e0e0e0;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      cursor: pointer;
+      font-size: 14px;
+      line-height: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background .25s ease, transform .25s ease, color .25s ease;
+      z-index: 4; /* above label */
+    }
+    .icon-btn:hover {
+      background: #00ffc8;
+      color: #0d1117;
+      transform: translateY(-50%) rotate(90deg);
+    }
+
+    /* Add/Remove animations for item fields */
+    .item-field {
+      opacity: 0;
+      transform: translateY(-8px) scale(0.98);
+      /* NOTE: overflow is now controlled in JS only during transitions */
+      transition:
+        opacity .28s ease,
+        transform .28s ease,
+        height .28s ease,
+        margin .28s ease,
+        padding .28s ease;
+    }
+    .item-field.in {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+    .item-field.out {
+      opacity: 0;
+      transform: translateY(-6px) scale(0.98);
+      margin-top: 0 !important;
+      padding-top: 0 !important;
+      padding-bottom: 0 !important;
+      border-width: 0;
+    }
+
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(-12px);} to { opacity: 1; transform: translateY(0);} }
+    @media (max-width: 480px) {
+      .card { padding: 25px 18px; }
+      .logo { width: 80px; }
+      h2 { font-size: 18px; }
+      .input:focus + .label,
+      .input:not(:placeholder-shown) + .label { top: -13px; } /* tiny lift on small screens */
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <img src="Photos/Logos/SOFILogo.png" alt="Sofi Logo" class="logo" />
+    <h2>Setup Wheel</h2>
+
+    <div class="field">
+      <input id="wheelTitle" class="input" type="text" placeholder=" " autocomplete="off" />
+      <label for="wheelTitle" class="label">Enter Wheel Title</label>
+    </div>
+
+    <div id="itemsContainer"></div>
+
+    <button class="btn" id="addItemBtn">+ Add Item</button>
+    <button class="btn" id="proceedBtn">Proceed to Spin Wheel</button>
+  </div>
+
+  <script>
+    let itemCount = 0;
+    const itemsContainer = document.getElementById("itemsContainer");
+    const addItemBtn = document.getElementById("addItemBtn");
+    const proceedBtn = document.getElementById("proceedBtn");
+
+    function animateRemove(fieldEl) {
+      // lock height and hide overflow only during collapse
+      fieldEl.style.overflow = 'hidden';
+      const current = fieldEl.scrollHeight;
+      fieldEl.style.height = current + "px";
+      fieldEl.offsetHeight; // force reflow
+      fieldEl.classList.add("out");
+      fieldEl.style.height = "0px";
+      const onDone = (e) => {
+        if (e.propertyName === "height") {
+          fieldEl.removeEventListener("transitionend", onDone);
+          fieldEl.remove();
+        }
+      };
+      fieldEl.addEventListener("transitionend", onDone);
+    }
+
+    function addItem(value = "") {
+      itemCount++;
+      const field = document.createElement("div");
+      field.className = "field item-field";
+
+      const input = document.createElement("input");
+      input.type = "text";
+      input.className = "input item-input";
+      input.placeholder = " ";
+      input.id = `item${itemCount}`;
+      input.value = value;
+
+      const label = document.createElement("label");
+      label.htmlFor = input.id;
+      label.className = "label";
+      label.textContent = `Enter Item ${itemCount}`;
+
+      const removeBtn = document.createElement("button");
+      removeBtn.type = "button";
+      removeBtn.className = "icon-btn";
+      removeBtn.setAttribute("aria-label", "Remove item");
+      removeBtn.innerHTML = "&#10005;";
+      removeBtn.addEventListener("click", () => animateRemove(field));
+
+      field.appendChild(input);
+      field.appendChild(label);
+      field.appendChild(removeBtn);
+      itemsContainer.appendChild(field);
+
+      // Animate add: temporarily hide overflow during expand
+      field.style.overflow = 'hidden';
+      field.style.height = "0px";
+      requestAnimationFrame(() => {
+        field.style.height = field.scrollHeight + "px";
+        field.classList.add("in");
+        field.addEventListener("transitionend", function tidy(e) {
+          if (e.propertyName === "height") {
+            field.style.height = "";      // back to auto
+            field.style.overflow = '';    // overflow visible again
+            field.removeEventListener("transitionend", tidy);
+          }
+        });
+      });
+    }
+
+    addItemBtn.addEventListener("click", () => addItem());
+
+    // Start with two item fields
+    addItem();
+    addItem();
+
+    proceedBtn.addEventListener("click", () => {
+      const title = (document.getElementById("wheelTitle").value || "").trim();
+      const itemInputs = itemsContainer.querySelectorAll("input.input");
+      const items = Array.from(itemInputs).map(i => i.value.trim()).filter(v => v.length > 0);
+
+      if (!title) {
+        alert("Please enter a Wheel Title.");
+        return;
+      }
+      if (items.length < 2) {
+        alert("Please add at least 2 items.");
+        return;
+      }
+
+      const payload = { title, items };
+      sessionStorage.setItem("wheelSetup", JSON.stringify(payload));
+      window.location.href = "spin.html";
+    });
+  </script>
+</body>
+</html>
